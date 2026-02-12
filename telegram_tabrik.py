@@ -2,15 +2,16 @@ from telegram.ext import ApplicationBuilder, MessageHandler, filters
 import os
 import pandas as pd
 import asyncio
-from datetime import datetime
+from datetime import datetime, timedelta
 import random
+import pytz
 
 # --- Sozlamalar ---
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 GROUP_ID = -1003613716463
 SHEET_CSV = "https://docs.google.com/spreadsheets/d/14Y5SwUSgO00VTgLYAZR73XoQGg3V-p8M/export?format=csv&gid=1184571774"
 
-# --- Motivatsion xabarlar (to'liq 10 ta) ---
+# --- Motivatsion xabarlar ---
 MOTIVATION_MESSAGES = [
     "🚆 Bugun yo‘llar tinch, vagonlar tartibli, siz esa fidoyi xodim sifatida o‘z ishini mukammal bajarishda davom etyapsiz! 💪",
     "⚡️ Har bir temir yo‘l uzelining harakati sizning mehnatingiz bilan bog‘liq. Bugun yangi marralarga intiling! 🚄",
@@ -27,19 +28,22 @@ MOTIVATION_MESSAGES = [
 # --- Rahmat tizimi ---
 THANKS_COUNTER = {}
 
-# --- Bugungi tug‘ilgan kunlarni olish ---
+# --- Oxirgi yuborilgan kunni saqlash ---
+LAST_SENT_DATE = None
+
+# --- Tug‘ilgan kunlarni olish ---
 def get_today_birthdays():
     try:
         df = pd.read_csv(SHEET_CSV).fillna('')
         df['tugilgan_kun'] = pd.to_datetime(df['tugilgan_kun'], errors='coerce')
-        today = datetime.now()
+        today = datetime.now(pytz.timezone("Asia/Tashkent")).date()
         return df[(df['tugilgan_kun'].dt.day == today.day) &
                   (df['tugilgan_kun'].dt.month == today.month)]
     except Exception as e:
         print("Xatolik CSV faylni o‘qishda:", e)
         return pd.DataFrame()
 
-# --- Tabrik matnini tayyorlash ---
+# --- Tabrik matni ---
 def prepare_birthday_message(df):
     if df.empty:
         return random.choice(MOTIVATION_MESSAGES)
@@ -66,18 +70,24 @@ Hurmat bilan "Qo'qon elektr ta'minoti" masofasi filiali!"""
 
 # --- Telegramga yuborish ---
 async def send_birthday(app):
-    msg = prepare_birthday_message(get_today_birthdays())
-    try:
-        await app.bot.send_message(chat_id=GROUP_ID, text=msg, parse_mode="Markdown")
-    except Exception as e:
-        print("Xatolik Telegramga yuborishda:", e)
+    global LAST_SENT_DATE
+    now = datetime.now(pytz.timezone("Asia/Tashkent"))
+    if now.hour == 16 and now.minute == 30:
+        if LAST_SENT_DATE != now.date():
+            df = get_today_birthdays()
+            msg = prepare_birthday_message(df)
+            try:
+                await app.bot.send_message(chat_id=GROUP_ID, text=msg, parse_mode="Markdown")
+                LAST_SENT_DATE = now.date()
+                except Exception as e:
+                print("Xatolik Telegramga yuborishda:", e)
 
-# --- Rahmat tizimi ishlashi ---
+# --- Rahmat tizimi ---
 async def handle_thanks(update, context):
     user_id = update.effective_user.id
     count = THANKS_COUNTER.get(user_id, 0) + 1
     THANKS_COUNTER[user_id] = count
-    reply = "🤗 Sizga doimo salomatlik va muvaffaqiyat tilaymiz!" if count == 1 else "😅 Qaytarormen!maazgii"
+    reply = "🤗 Sizga doimo salomatlik va muvaffaqiyat tilaymiz!" if count == 1 else "😅 Qaytarormen! maazgii"
     await update.message.reply_text(reply)
 
 # --- Bot ishga tushishi ---
@@ -88,11 +98,10 @@ async def main():
     thanks_words = ["rahmat", "raxmat", "raxmad", "rahmad", "рахмад", "рамат"]
     app.add_handler(MessageHandler(filters.TEXT & filters.Regex("|".join(thanks_words)), handle_thanks))
 
-    # Bugungi tabrikni yuborish
-    await send_birthday(app)
-
-    # Doimiy ishlash uchun polling
-    await app.run_polling()
+    # Doimiy ishga tushirish
+    while True:
+        await send_birthday(app)
+        await asyncio.sleep(60)  # har daqiqa tekshiradi
 
 if __name__ == "__main__":
     asyncio.run(main())
