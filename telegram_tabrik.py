@@ -10,7 +10,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 GROUP_ID = -1003613716463
 SHEET_CSV = "https://docs.google.com/spreadsheets/d/14Y5SwUSgO00VTgLYAZR73XoQGg3V-p8M/export?format=csv&gid=1184571774"
 
-# --- Motivatsion xabarlar ---
+# --- Motivatsion xabarlar (to'liq 10 ta) ---
 MOTIVATION_MESSAGES = [
     "🚆 Bugun yo‘llar tinch, vagonlar tartibli, siz esa fidoyi xodim sifatida o‘z ishini mukammal bajarishda davom etyapsiz! 💪",
     "⚡️ Har bir temir yo‘l uzelining harakati sizning mehnatingiz bilan bog‘liq. Bugun yangi marralarga intiling! 🚄",
@@ -24,6 +24,7 @@ MOTIVATION_MESSAGES = [
     "🚀 Fidoyi xodimlar yo‘llarimizni xavfsiz qiladi va taraqqiyotga hissa qo‘shadi. Bugun yangi marralarga intiling!"
 ]
 
+# --- Rahmat tizimi ---
 THANKS_COUNTER = {}
 
 # --- Bugungi tug‘ilgan kunlarni olish ---
@@ -71,12 +72,12 @@ async def send_birthday(app):
     except Exception as e:
         print("Xatolik Telegramga yuborishda:", e)
 
-# --- Rahmat tizimi ---
+# --- Rahmat tizimi ishlashi ---
 async def handle_thanks(update, context):
     user_id = update.effective_user.id
     count = THANKS_COUNTER.get(user_id, 0) + 1
     THANKS_COUNTER[user_id] = count
-    reply = "🤗 Sizga doimo salomatlik va muvaffaqiyat tilaymiz!" if count == 1 else "😅 Qaytarormen! maazgii"
+    reply = "🤗 Sizga doimo salomatlik va muvaffaqiyat tilaymiz!" if count == 1 else "😅 Qaytarormen!maazgii"
     await update.message.reply_text(reply)
 
 # --- Bot ishga tushishi ---
