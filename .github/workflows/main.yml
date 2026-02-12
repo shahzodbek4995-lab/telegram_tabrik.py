@@ -1,0 +1,28 @@
+name: Birthday Bot
+
+on:
+  schedule:
+    - cron: "0 10 * * *"   # 15:00 Toshkent (UTC+5)
+  workflow_dispatch:
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Kodni olish
+        uses: actions/checkout@v4
+
+      - name: Python o'rnatish
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Kutubxonalarni o'rnatish
+        run: |
+          pip install pandas python-telegram-bot==20.3
+
+      - name: Botni ishga tushirish
+        run: python telegram_tabrik.py
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
