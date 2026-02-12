@@ -1,26 +1,28 @@
-except Exception as e:
-                print("Xatolik Telegramga yuborishda:", e)
+name: Birthday Bot
 
-# --- Rahmat tizimi ---
-async def handle_thanks(update, context):
-    user_id = update.effective_user.id
-    count = THANKS_COUNTER.get(user_id, 0) + 1
-    THANKS_COUNTER[user_id] = count
-    reply = "🤗 Sizga doimo salomatlik va muvaffaqiyat tilaymiz!" if count == 1 else "😅 Qaytarormen!"
-    await update.message.reply_text(reply)
+on:
+  schedule:
+    - cron: '30 11 * * *'  # UTC vaqtida 16:30 Toshkent (UTC+5)
+  workflow_dispatch:        # Qo'lda ishga tushirish uchun
 
-# --- Bot ishga tushishi ---
-async def main():
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
 
-    # Rahmat xabarlarini tinglash
-    thanks_words = ["rahmat", "raxmat", "raxmad", "rahmad", "рахмад", "рамат"]
-    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("|".join(thanks_words)), handle_thanks))
+    steps:
+      - name: Kodni olish
+        uses: actions/checkout@v4
 
-    # Doimiy ishga tushirish
-    while True:
-        await send_birthday(app)
-        await asyncio.sleep(60)  # har daqiqa tekshiradi
+      - name: Python o'rnatish
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
 
-if name == "__main__":
-    asyncio.run(main())
+      - name: Kutubxonalarni o'rnatish
+        run: |
+          pip install pandas python-telegram-bot==20.3 pytz
+
+      - name: Botni ishga tushirish
+        run: python telegram_tabrik.py
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
