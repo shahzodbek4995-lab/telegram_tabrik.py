@@ -76,7 +76,7 @@ async def handle_thanks(update, context):
     user_id = update.effective_user.id
     count = THANKS_COUNTER.get(user_id, 0) + 1
     THANKS_COUNTER[user_id] = count
-    reply = "🤗 Sizga doimo salomatlik va muvaffaqiyat tilaymiz!" if count == 1 else "😅 Qaytarormen ! maazgii"
+    reply = "🤗 Sizga doimo salomatlik va muvaffaqiyat tilaymiz!" if count == 1 else "😅 Qaytarormen! maazgii"
     await update.message.reply_text(reply)
 
 # --- Bot ishga tushishi ---
@@ -90,10 +90,8 @@ async def main():
     # Bugungi tabrikni yuborish
     await send_birthday(app)
 
-    # Botni start va polling
-    await app.start()
-    await app.updater.start_polling()
-    await app.updater.idle()
+    # Doimiy ishlash uchun polling
+    await app.run_polling()
 
 if __name__ == "__main__":
     asyncio.run(main())
