@@ -2,7 +2,7 @@ name: Birthday Bot
 
 on:
   schedule:
-    - cron: "0 10 * * *"   # 15:00 Toshkent (UTC+5)
+    - cron: "40 10 * * *"   # 15:40 Toshkent (UTC+5)
   workflow_dispatch:
 
 jobs:
