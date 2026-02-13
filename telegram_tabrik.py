@@ -79,7 +79,9 @@ async def send_birthday(app):
             try:
                 await app.bot.send_message(chat_id=GROUP_ID, text=msg, parse_mode="Markdown")
                 LAST_SENT_DATE = now.date()
-                except Exception as e:
+            try:
+                    print("Hello")
+            except Exception as e:
                 print("Xatolik Telegramga yuborishda:", e)
 
 # --- Rahmat tizimi ---
