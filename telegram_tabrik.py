@@ -108,7 +108,7 @@ def main():
 
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, reply_handler))
 
-    schedule.every().day.at("09:00").do(lambda: check_birthdays(updater.bot))
+    schedule.every(1).minutes
 
     updater.start_polling()
 
