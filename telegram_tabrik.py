@@ -1,109 +1,121 @@
-from telegram.ext import ApplicationBuilder, MessageHandler, filters
-import os
 import pandas as pd
-import asyncio
-from datetime import datetime, timedelta
+import requests
+import schedule
+import time
 import random
-import pytz
+from datetime import datetime
+from telegram.ext import Updater, MessageHandler, Filters
 
-# --- Sozlamalar ---
-BOT_TOKEN = os.getenv("BOT_TOKEN")
+# ================== SOZLAMALAR ==================
+TOKEN = "8468084793:AAGCPlKpZP8ioIziKzW5Bvz1sL-Jv20L2cg"
 GROUP_ID = -1003613716463
-SHEET_CSV = "https://docs.google.com/spreadsheets/d/14Y5SwUSgO00VTgLYAZR73XoQGg3V-p8M/export?format=csv&gid=1184571774"
 
-# --- Motivatsion xabarlar ---
-MOTIVATION_MESSAGES = [
-    "🚆 Bugun yo‘llar tinch, vagonlar tartibli, siz esa fidoyi xodim sifatida o‘z ishini mukammal bajarishda davom etyapsiz! 💪",
-    "⚡️ Har bir temir yo‘l uzelining harakati sizning mehnatingiz bilan bog‘liq. Bugun yangi marralarga intiling! 🚄",
-    "🌟 Sizning mas’uliyatli va e’tiborli mehnatingiz tufayli yurtimiz taraqqiyotga intilmoqda. Bugun ham shunday davom eting!",
-    "🚧 Vagonlar, relslar, stansiyalar… hammasi sizning mehnatingiz bilan tinch va xavfsiz ishlaydi. Rahmat sizga!",
-    "🎯 Har bir to‘xtovsiz harakat, har bir belgilangan vaqtni bajarish – bu sizning fidoyiligingiz! Bugun yangi marralarni zabt eting!",
-    "💡 Yangi loyihalar, yangi imkoniyatlar – temir yo‘l sohasi doimo yangilanadi. Siz ham yangilikka tayyormisiz?",
-    "🛤 Bugun hech kim tug‘ilgan kunini nishonlamasa ham, jamoamiz faol va yo‘llar xavfsiz! Sizning mehnatingiz buning garovi!",
-    "🌈 Har bir kun – yangi imkoniyat. Bugun biror yangilikni o‘zingiz yaratib, hamkasblaringizni ilhomlantiring!",
-    "🏅 Sizning mas’uliyatli mehnatingiz temir yo‘l infratuzilmasini mukammal ishlashini ta’minlaydi. Bugun ham shunday davom eting!",
-    "🚀 Fidoyi xodimlar yo‘llarimizni xavfsiz qiladi va taraqqiyotga hissa qo‘shadi. Bugun yangi marralarga intiling!"
+CSV_URL = "https://docs.google.com/spreadsheets/d/14Y5SwUSgO00VTgLYAZR73XoQGg3V-p8M/export?format=csv&gid=1184571774"
+
+rahmat_words = ["rahmat","rahmad","Rahmat","Rahmad",
+                "рахмат","Рахмат","Рахмад","рахмад"]
+
+rahmat_count = 0
+
+random_messages = [
+"🚆 Bugun yo‘llar tinch, vagonlar tartibli, siz esa fidoyi xodim sifatida o‘z ishini mukammal bajarishda davom etyapsiz! 💪",
+"⚡️ Har bir temir yo‘l uzelining harakati sizning mehnatingiz bilan bog‘liq. Bugun yangi marralarga intiling! 🚄",
+"🌟 Sizning mas’uliyatli mehnatingiz tufayli yurtimiz taraqqiyotga intilmoqda. Bugun ham shunday davom eting!",
+"🚧 Vagonlar, relslar, stansiyalar… hammasi sizning mehnatingiz bilan tinch va xavfsiz ishlaydi. Rahmat sizga!",
+"🎯 Har bir belgilangan vaqtni bajarish – bu sizning fidoyiligingiz! Bugun yangi marralarni zabt eting!",
+"💡 Yangi loyihalar va imkoniyatlar – siz doimo oldindasiz!",
+"🛤 Jamoamiz faol va yo‘llar xavfsiz! Sizning mehnatingiz buning garovi!",
+"🌈 Har bir kun – yangi imkoniyat. Bugun ham ilhomlantiring!",
+"🏅 Sizning mas’uliyatli mehnatingiz tizimni mukammal ishlashini ta’minlaydi!",
+"🚀 Fidoyi xodimlar taraqqiyotga hissa qo‘shadi!"
 ]
 
-# --- Rahmat tizimi ---
-THANKS_COUNTER = {}
+# ================== TUG‘ILGAN KUN TEKSHIRISH ==================
 
-# --- Oxirgi yuborilgan kunni saqlash ---
-LAST_SENT_DATE = None
-
-# --- Tug‘ilgan kunlarni olish ---
-def get_today_birthdays():
+def check_birthdays(bot):
     try:
-        df = pd.read_csv(SHEET_CSV).fillna('')
-        df['tugilgan_kun'] = pd.to_datetime(df['tugilgan_kun'], errors='coerce')
-        today = datetime.now(pytz.timezone("Asia/Tashkent")).date()
-        return df[(df['tugilgan_kun'].dt.day == today.day) &
-                  (df['tugilgan_kun'].dt.month == today.month)]
+        df = pd.read_csv(CSV_URL)
     except Exception as e:
-        print("Xatolik CSV faylni o‘qishda:", e)
-        return pd.DataFrame()
+        print("CSV yuklanmadi:", e)
+        return
 
-# --- Tabrik matni ---
-def prepare_birthday_message(df):
-    if df.empty:
-        return random.choice(MOTIVATION_MESSAGES)
+    today = datetime.now().strftime("%d.%m")
+    birthday_people = []
 
-    names = []
-    for _, row in df.iterrows():
-        ism = str(row.get('ism', '')).strip()
-        bolim = str(row.get('bolim', '')).strip()
-        if ism:
-            names.append(f"*{ism} ({bolim})*" if bolim else f"*{ism}*")
+    for index, row in df.iterrows():
+        try:
+            birth_date = str(row['tugulgan_kun'])
+            name = row['ism']
+            department = row['bolim']
 
-    if len(names) == 1:
-        return f"""Hurmatli {names[0]} temir yo‘l sohasining fidoyi xodimi.
+            if today in birth_date:
+                birthday_people.append((name, department))
+        except:
+            continue
+
+    # ===== 1 ta xodim =====
+    if len(birthday_people) == 1:
+        name, dept = birthday_people[0]
+        message = f"""Hurmatli {name} ({dept}) temir yo‘l sohasining fidoyi xodimi.
 
 Sizni tug‘ilgan kuningiz bilan chin qalbimizdan tabriklaymiz. Mas’uliyatli va sharafli mehnatingiz bilan yurtimiz taraqqiyotiga munosib hissa qo‘shib kelmoqdasiz. Sizga mustahkam sog‘liq, oilaviy baxt, ishlaringizda doimiy muvaffaqiyat va xavfsiz yo‘llar tilaymiz! Yana bir bor tug'ulgan kunigiz bilan tabriklaymiz.
 
-Hurmat bilan "Qo'qon elektr ta'minoti" masofasi filiali!"""
-    else:
-        return f"""Hurmatli {', '.join(names)} temir yo‘l sohasining fidoyi xodimlari.
+Hurmat bilan "Qo'qon elektr ta'minoti" masofasi filiali!
+"""
+        bot.send_message(chat_id=GROUP_ID, text=message)
+
+    # ===== 2+ ta xodim =====
+    elif len(birthday_people) > 1:
+        names = ", ".join([f"{n} ({d})" for n,d in birthday_people])
+        message = f"""Hurmatli {names} temir yo‘l sohasining fidoyi xodimlari.
 
 Sizlarni tug‘ilgan kuningiz bilan chin qalbimizdan tabriklaymiz. Mas’uliyatli va sharafli mehnatingiz bilan yurtimiz taraqqiyotiga munosib hissa qo‘shib kelmoqdasiz. Sizlarga mustahkam sog‘liq, oilaviy baxt, ishlaringizda doimiy muvaffaqiyat va xavfsiz yo‘llar tilaymiz! Yana bir bor tug'ulgan kunigiz bilan tabriklaymiz.
 
-Hurmat bilan "Qo'qon elektr ta'minoti" masofasi filiali!"""
+Hurmat bilan "Qo'qon elektr ta'minoti" masofasi filiali!
+"""
+        bot.send_message(chat_id=GROUP_ID, text=message)
 
-# --- Telegramga yuborish ---
-async def send_birthday(app):
-    global LAST_SENT_DATE
-    now = datetime.now(pytz.timezone("Asia/Tashkent"))
-    if now.hour == 16 and now.minute == 30:
-        if LAST_SENT_DATE != now.date():
-            df = get_today_birthdays()
-            msg = prepare_birthday_message(df)
-            try:
-                await app.bot.send_message(chat_id=GROUP_ID, text=msg, parse_mode="Markdown")
-                LAST_SENT_DATE = now.date()
-            try:
-                    print("Hello")
-            except Exception as e:
-                print("Xatolik Telegramga yuborishda:", e)
+    # ===== Tug‘ilgan kun yo‘q =====
+    else:
+        main_msg = "🎉 Afsus! Bugun tug‘ilgan kun yo‘q! Lekin bugun mening tug‘ilgan kunim! Uraaa, tabriklasalaring bo‘ladi! 🥳🎂"
+        bot.send_message(chat_id=GROUP_ID, text=main_msg)
 
-# --- Rahmat tizimi ---
-async def handle_thanks(update, context):
-    user_id = update.effective_user.id
-    count = THANKS_COUNTER.get(user_id, 0) + 1
-    THANKS_COUNTER[user_id] = count
-    reply = "🤗 Sizga doimo salomatlik va muvaffaqiyat tilaymiz!" if count == 1 else "😅 Qaytarormen! maazgii"
-    await update.message.reply_text(reply)
+        random_msg = "Afsus! Bugun tug‘ilgan kun yo‘q!\n\n" + random.choice(random_messages)
+        bot.send_message(chat_id=GROUP_ID, text=random_msg)
 
-# --- Bot ishga tushishi ---
-async def main():
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
 
-    # Rahmat xabarlarini tinglash
-    thanks_words = ["rahmat", "raxmat", "raxmad", "rahmad", "рахмад", "рамат"]
-    app.add_handler(MessageHandler(filters.TEXT & filters.Regex("|".join(thanks_words)), handle_thanks))
+# ================== RAHMAT JAVOB ==================
 
-    # Doimiy ishga tushirish
+def reply_handler(update, context):
+    global rahmat_count
+    text = update.message.text
+
+    if text in rahmat_words:
+        rahmat_count += 1
+
+        if rahmat_count == 1:
+            update.message.reply_text("🤗 Sizga doimo muvaffaqiyat tilaymiz!")
+        elif rahmat_count >= 2:
+            update.message.reply_text("😅 qaytarormen maazgii")
+            rahmat_count = 0
+
+
+# ================== BOT ISHGA TUSHISH ==================
+
+def main():
+    updater = Updater(TOKEN, use_context=True)
+    dp = updater.dispatcher
+
+    dp.add_handler(MessageHandler(Filters.text & ~Filters.command, reply_handler))
+
+    schedule.every().day.at("09:00").do(lambda: check_birthdays(updater.bot))
+
+    updater.start_polling()
+
     while True:
-        await send_birthday(app)
-        await asyncio.sleep(60)  # har daqiqa tekshiradi
+        schedule.run_pending()
+        time.sleep(10)
+
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    main()
